@@ -3,13 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "worker",
     "frontend"
   ],
   "scripts": {
     "dev": "npm run dev -w frontend",
-    "dev:worker": "npm run dev -w worker",
-    "build": "npm run build --workspaces --if-present",
+    "dev:worker": "cd worker && npx wrangler dev",
+    "build": "npm run build -w frontend",
     "typecheck": "npm run typecheck --workspaces --if-present"
   }
 }
