@@ -1,0 +1,55 @@
+name = "dermatology-clinic-api"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ============================================================
+# D1 Database
+# ============================================================
+[[d1_databases]]
+binding = "DB"
+database_name = "clinic-db"
+database_id = "replace-with-your-database-id"
+
+# ============================================================
+# R2 Bucket (stub for Phase 1 - images in later phases)
+# ============================================================
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "clinic-images"
+
+# ============================================================
+# Environment Variables
+# ============================================================
+[vars]
+JWT_SECRET = "change-this-in-production-use-a-strong-random-secret"
+CLINIC_NAME = "SkinCare Clinic"
+CLINIC_ADDRESS = "123 Medical Drive, Suite 200, Cityville, ST 12345"
+CLINIC_PHONE = "+1 (555) 123-4567"
+CLINIC_EMAIL = "hello@skincareclinic.com"
+BASE_URL = "http://localhost:8787"
+
+# WhatsApp Provider Configuration
+WHATSAPP_PROVIDER = "twilio"
+TWILIO_ACCOUNT_SID = "your-twilio-account-sid"
+TWILIO_AUTH_TOKEN = "your-twilio-auth-token"
+TWILIO_WHATSAPP_FROM = "+14155238886"
+
+# Email Provider Configuration
+EMAIL_PROVIDER = "resend"
+RESEND_API_KEY = "your-resend-api-key"
+RESEND_FROM_EMAIL = "noreply@skincareclinic.com"
+
+# ============================================================
+# Scheduled Triggers (uncomment for production)
+# ============================================================
+# [triggers]
+# crons = ["0 8 * * *", "0 */2 * * *"]
+#   - 8am daily: send day-of reminders + feedback requests
+#   - every 2 hours: send upcoming-hour reminders
+
+# ============================================================
+# Cloudflare Pages integration
+# ============================================================
+# [site]
+# bucket = "../frontend/public-site/dist"

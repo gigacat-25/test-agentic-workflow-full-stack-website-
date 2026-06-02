@@ -1,0 +1,9 @@
+{
+  "name": "dermatology-clinic",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "worker",
+    "frontend/*"
+  ]
+}
