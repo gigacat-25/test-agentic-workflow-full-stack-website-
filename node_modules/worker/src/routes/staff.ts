@@ -143,12 +143,23 @@ export function registerStaffRoutes(router: any, services: AppServices, env: Env
   // ============================================================
   // POST /api/staff/appointments/:id/complete
   // ============================================================
-  router.post('/api/staff/appointments/:id/complete', withAuth, async (request: any) => {
+  router.post('/api/staff/appointments/:id/complete', withAuth, async (request: any, env: Env, ctx: ExecutionContext) => {
     const appointmentId = request.params?.id;
     if (!appointmentId) throw badRequest('Appointment ID required');
 
     const staffUserId = request.staffUser?.id;
     const appointment = await appointmentService.complete(appointmentId, staffUserId);
+
+    // Trigger post-visit feedback workflow instance for this specific appointment
+    if (env.POST_VISIT_WORKFLOW) {
+      ctx.waitUntil(
+        env.POST_VISIT_WORKFLOW.create({
+          params: { appointmentId: appointment.id },
+        }).catch(err => {
+          console.error('[Workflow] Failed to trigger POST_VISIT_WORKFLOW:', err);
+        })
+      );
+    }
 
     return new Response(
       JSON.stringify({ success: true, message: 'Appointment completed', appointment }),

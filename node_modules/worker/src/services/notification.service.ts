@@ -42,6 +42,46 @@ export class NotificationService {
   }
 
   /**
+   * Send appointment request receipt.
+   */
+  async sendAppointmentRequestReceipt(appointment: Appointment, patient: Patient): Promise<void> {
+    const dateStr = new Date(appointment.start_time).toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    const timeStr = new Date(appointment.start_time).toLocaleTimeString('en-US', {
+      hour: '2-digit', minute: '2-digit',
+    });
+
+    const channels = this.getChannels(patient);
+
+    for (const channel of channels) {
+      try {
+        if (channel === 'whatsapp' && patient.phone) {
+          await this.whatsappProvider.sendTextMessage(
+            patient.phone,
+            `📅 Appointment Requested!\n\nDear ${patient.name},\n\nWe have received your appointment request at ${this.clinicName} for:\n📅 ${dateStr}\n⏰ ${timeStr}\n\nWe will review and confirm your slot shortly.`,
+          );
+        }
+        if (channel === 'email' && patient.email) {
+          const html = this.buildEmailHtml(
+            'Appointment Requested',
+            `<h2>We have received your appointment request</h2>
+             <p>Dear ${patient.name},</p>
+             <p>Thank you for requesting an appointment at ${this.clinicName}. We are currently reviewing your request and will send you a confirmation email shortly.</p>
+             <hr>
+             <p><strong>Requested Date:</strong> ${dateStr}</p>
+             <p><strong>Requested Time:</strong> ${timeStr}</p>
+             <p><strong>Service:</strong> ${appointment.service_type}</p>`,
+          );
+          await this.emailProvider.sendEmail(patient.email, `Appointment Request Received - ${this.clinicName}`, html);
+        }
+      } catch (err) {
+        console.error(`[Notification] Failed to send request receipt ${channel}:`, err);
+      }
+    }
+  }
+
+  /**
    * Send appointment confirmation notification.
    */
   async sendAppointmentConfirmation(appointment: Appointment, patient: Patient): Promise<void> {
