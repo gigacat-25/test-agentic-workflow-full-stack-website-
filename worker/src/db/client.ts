@@ -2,6 +2,8 @@
 // D1 Database client helpers
 // ============================================================
 
+import type { Workflow } from '@cloudflare/workers-types';
+
 /**
  * Cloudflare Worker Environment bindings.
  * Add all D1, R2, KV, and variable bindings here.
@@ -12,6 +14,10 @@ export interface Env {
 
   // R2 Bucket (for future image uploads)
   IMAGES_BUCKET: R2Bucket;
+
+  // Cloudflare Workflows
+  REMINDER_WORKFLOW: Workflow;
+  POST_VISIT_WORKFLOW: Workflow;
 
   // Auth
   JWT_SECRET: string;

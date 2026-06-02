@@ -1,0 +1,15 @@
+# Cloudflare Pages configuration
+# This tells Cloudflare Pages to treat the 'frontend' subdirectory
+# as the project root, avoiding the npm workspace symlink conflict
+# where node_modules/worker symlinks cause the build to fail.
+#
+# Dashboard settings to match:
+#   Root directory:      frontend
+#   Build command:       npm ci && npm run build
+#   Build output dir:    dist
+
+[build]
+command = "npm ci && npm run build"
+
+[build.environment]
+NODE_VERSION = "20"
