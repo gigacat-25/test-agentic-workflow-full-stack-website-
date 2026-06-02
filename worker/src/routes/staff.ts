@@ -125,6 +125,34 @@ export function registerStaffRoutes(router: any, services: AppServices, env: Env
   });
 
   // ============================================================
+  // POST /api/staff/appointments/:id/confirm
+  // Staff accepts a requested booking and sends confirmation email
+  // ============================================================
+  router.post('/api/staff/appointments/:id/confirm', withAuth, async (request: any) => {
+    const appointmentId = request.params?.id;
+    if (!appointmentId) throw badRequest('Appointment ID required');
+
+    const appointment = await appointmentService.confirm(appointmentId);
+
+    // Send confirmation email / WhatsApp (fire and forget)
+    try {
+      const patient = await patientService.findById(appointment.patient_id);
+      if (patient) {
+        services.notificationService.sendAppointmentConfirmation(appointment, patient).catch(e => {
+          console.error('[Notification] Failed to send booking confirmation:', e);
+        });
+      }
+    } catch (err) {
+      console.error('[Notification] Error sending booking confirmation:', err);
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, message: 'Appointment confirmed', appointment }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  });
+
+  // ============================================================
   // POST /api/staff/appointments/:id/check-in
   // ============================================================
   router.post('/api/staff/appointments/:id/check-in', withAuth, async (request: any) => {
@@ -176,6 +204,17 @@ export function registerStaffRoutes(router: any, services: AppServices, env: Env
 
     const body = (await request.json?.() || {}) as Record<string, any>;
     const appointment = await appointmentService.cancel(appointmentId, body.reason as string);
+
+    try {
+      const patient = await patientService.findById(appointment.patient_id);
+      if (patient) {
+        services.notificationService.sendAppointmentCancellation(appointment, patient).catch(e => {
+          console.error('[Notification] Failed to send cancellation notice:', e);
+        });
+      }
+    } catch (err) {
+      console.error('[Notification] Error sending cancellation notice:', err);
+    }
 
     return new Response(
       JSON.stringify({ success: true, message: 'Appointment cancelled', appointment }),

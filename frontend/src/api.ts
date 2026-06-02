@@ -182,13 +182,12 @@ export async function noShowAppointment(token: string, id: string): Promise<Appo
 }
 
 export async function confirmAppointment(token: string, id: string): Promise<Appointment> {
-  const data = await fetchWithAuth(`/api/public/appointments/confirm`, token, {
+  const data = await fetchWithAuth(`/api/staff/appointments/${encodeURIComponent(id)}/confirm`, token, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ appointmentId: id }),
   });
   return data.appointment;
 }
+
 
 export async function getPatientDetail(token: string, id: string): Promise<{
   patient: StaffPatient;
