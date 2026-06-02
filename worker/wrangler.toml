@@ -9,7 +9,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "clinic-db"
-database_id = "replace-with-your-database-id"
+database_id = "32eb3255-d8d1-45b0-8796-4345a539438c"
 
 # ============================================================
 # R2 Bucket (stub for Phase 1 - images in later phases)
@@ -36,7 +36,7 @@ TWILIO_AUTH_TOKEN = "your-twilio-auth-token"
 TWILIO_WHATSAPP_FROM = "+14155238886"
 
 # Email Provider Configuration
-EMAIL_PROVIDER = "resend"
+EMAIL_PROVIDER = "gmail"
 RESEND_API_KEY = "your-resend-api-key"
 RESEND_FROM_EMAIL = "noreply@skincareclinic.com"
 

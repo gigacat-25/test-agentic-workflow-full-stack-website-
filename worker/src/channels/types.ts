@@ -61,7 +61,7 @@ export interface EmailProvider {
 // Provider Configuration
 // -----------------------------------------------------------------
 export type WhatsAppProviderType = 'twilio' | 'meta';
-export type EmailProviderType = 'resend' | 'sendgrid' | 'mailgun';
+export type EmailProviderType = 'resend' | 'sendgrid' | 'mailgun' | 'gmail';
 
 export interface WhatsAppConfig {
   provider: WhatsAppProviderType | string;
@@ -80,6 +80,10 @@ export interface EmailConfig {
   credentials: {
     apiKey?: string;
     fromEmail?: string;
+    clientId?: string;
+    clientSecret?: string;
+    refreshToken?: string;
+    senderEmail?: string;
     [key: string]: string | undefined;
   };
 }

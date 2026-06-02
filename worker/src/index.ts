@@ -91,7 +91,7 @@ export default {
 
       // Register route handlers with services
       registerPublicRoutes(router, services);
-      registerStaffRoutes(router, services, env.JWT_SECRET);
+      registerStaffRoutes(router, services, env);
       registerWebhookRoutes(router, services);
 
       // Handle the request
@@ -166,6 +166,10 @@ function createServices(env: Env): AppServices {
     credentials: {
       apiKey: env.RESEND_API_KEY || '',
       fromEmail: env.RESEND_FROM_EMAIL || 'noreply@skincareclinic.com',
+      clientId: env.GOOGLE_GMAIL_CLIENT_ID || '',
+      clientSecret: env.GOOGLE_GMAIL_CLIENT_SECRET || '',
+      refreshToken: env.GOOGLE_GMAIL_REFRESH_TOKEN || '',
+      senderEmail: env.GOOGLE_GMAIL_SENDER_EMAIL || '',
     },
   });
 

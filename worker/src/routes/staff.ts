@@ -13,9 +13,10 @@ import { badRequest, unauthorized } from '../utils/errors';
 import { StaffRole } from '../db/schema';
 import { generateId, Env } from '../db/client';
 
-export function registerStaffRoutes(router: any, services: AppServices, jwtSecret: string): void {
+export function registerStaffRoutes(router: any, services: AppServices, env: Env): void {
   const { patientService, appointmentService, followUpService, feedbackService } = services;
-  const { withAuth, withRoles } = createAuthMiddleware(jwtSecret);
+  const authSecretOrJwks = env.CLERK_JWKS_URL || env.JWT_SECRET;
+  const { withAuth, withRoles } = createAuthMiddleware(authSecretOrJwks, env.DB);
 
   // ============================================================
   // POST /api/staff/auth/login
@@ -49,7 +50,7 @@ export function registerStaffRoutes(router: any, services: AppServices, jwtSecre
     // Generate JWT
     const token = await generateToken(
       { staffUserId: staffUser.id, role: staffUser.role as StaffRole },
-      jwtSecret,
+      env.JWT_SECRET,
     );
 
     return new Response(
@@ -281,6 +282,75 @@ export function registerStaffRoutes(router: any, services: AppServices, jwtSecre
 
     return new Response(
       JSON.stringify({ success: true, message: 'Follow-up completed', followUp }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  });
+
+  // ============================================================
+  // POST /api/staff/alerts/call-next
+  // ============================================================
+  router.post('/api/staff/alerts/call-next', withAuth, async (request: any, env: Env) => {
+    const body = (await request.json?.() || {}) as Record<string, any>;
+    validateRequired(body, ['appointmentId']);
+
+    const appointmentId = body.appointmentId;
+
+    const appointmentWithPatient = await env.DB
+      .prepare(`
+        SELECT a.id, p.name as patient_name 
+        FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        WHERE a.id = ?
+      `)
+      .bind(appointmentId)
+      .first<{ id: string; patient_name: string }>();
+
+    if (!appointmentWithPatient) {
+      throw badRequest('Appointment not found');
+    }
+
+    const alertId = generateId();
+    await env.DB
+      .prepare('INSERT INTO receptionist_alerts (id, patient_name, appointment_id, status) VALUES (?, ?, ?, ?)')
+      .bind(alertId, appointmentWithPatient.patient_name, appointmentId, 'pending')
+      .run();
+
+    return new Response(
+      JSON.stringify({ success: true, message: 'Notification sent to staff' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  });
+
+  // ============================================================
+  // GET /api/staff/alerts/pending
+  // ============================================================
+  router.get('/api/staff/alerts/pending', withAuth, async (request: any, env: Env) => {
+    const alerts = await env.DB
+      .prepare("SELECT * FROM receptionist_alerts WHERE status = 'pending' ORDER BY created_at DESC")
+      .all();
+
+    return new Response(
+      JSON.stringify({ success: true, alerts: alerts.results || [] }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  });
+
+  // ============================================================
+  // POST /api/staff/alerts/:id/acknowledge
+  // ============================================================
+  router.post('/api/staff/alerts/:id/acknowledge', withAuth, async (request: any, env: Env) => {
+    const alertId = request.params?.id;
+    if (!alertId) {
+      throw badRequest('Alert ID required');
+    }
+
+    await env.DB
+      .prepare("UPDATE receptionist_alerts SET status = 'acknowledged' WHERE id = ?")
+      .bind(alertId)
+      .run();
+
+    return new Response(
+      JSON.stringify({ success: true }),
       { status: 200, headers: { 'Content-Type': 'application/json' } },
     );
   });

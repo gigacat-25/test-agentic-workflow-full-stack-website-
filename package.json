@@ -4,13 +4,12 @@
   "private": true,
   "workspaces": [
     "worker",
-    "frontend/*"
+    "frontend"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev": "npm run dev -w frontend",
     "dev:worker": "npm run dev -w worker",
-    "dev:public": "npm run dev -w public-site",
-    "dev:staff": "npm run dev -w staff-dashboard"
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   }
 }

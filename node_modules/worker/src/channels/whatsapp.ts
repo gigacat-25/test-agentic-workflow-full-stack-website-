@@ -278,6 +278,105 @@ export class ResendEmailProvider implements EmailProvider {
   }
 }
 
+/**
+ * Gmail OAuth 2.0 Email Provider
+ * Docs: https://developers.google.com/gmail/api/reference/rest/v1/users.messages/send
+ */
+export class GmailEmailProvider implements EmailProvider {
+  private clientId: string;
+  private clientSecret: string;
+  private refreshToken: string;
+  private senderEmail: string;
+
+  constructor(config: EmailConfig['credentials']) {
+    this.clientId = config.clientId || '';
+    this.clientSecret = config.clientSecret || '';
+    this.refreshToken = config.refreshToken || '';
+    this.senderEmail = config.senderEmail || '';
+
+    if (!this.clientId || !this.clientSecret || !this.refreshToken) {
+      console.warn('GmailEmailProvider: Missing Google OAuth credentials');
+    }
+  }
+
+  private async getAccessToken(): Promise<string> {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        refresh_token: this.refreshToken,
+        grant_type: 'refresh_token',
+      }).toString(),
+    });
+
+    const data = await response.json<any>();
+    if (!response.ok) {
+      console.error('[Gmail OAuth] Token refresh failed:', data);
+      throw new Error(`Gmail OAuth token error: ${data.error_description || response.statusText}`);
+    }
+
+    return data.access_token;
+  }
+
+  async sendEmail(to: string, subject: string, html: string): Promise<EmailResult> {
+    if (!this.clientId) {
+      console.log(`[Gmail Mock] Would send email to ${to}: ${subject}`);
+      return { messageId: `mock-${Date.now()}`, provider: 'gmail' };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    // Construct raw MIME email
+    const emailLines = [
+      `From: ${this.senderEmail}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: text/html; charset=utf-8`,
+      `Content-Transfer-Encoding: 7bit`,
+      ``,
+      html
+    ];
+    const rawEmail = emailLines.join('\r\n');
+    
+    // Web-safe base64 encoding (RFC 4648)
+    const utf8Bytes = new TextEncoder().encode(rawEmail);
+    let binary = '';
+    const len = utf8Bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(utf8Bytes[i]);
+    }
+    const encodedEmail = btoa(binary)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        raw: encodedEmail,
+      }),
+    });
+
+    const result = await response.json<any>();
+
+    if (!response.ok) {
+      console.error('[Gmail] Failed to send email:', result);
+      throw new Error(`Gmail error: ${result.error?.message || response.statusText}`);
+    }
+
+    return { messageId: result.id, provider: 'gmail' };
+  }
+}
+
 // ============================================================
 // Email Provider Factory
 // ============================================================
@@ -286,6 +385,8 @@ export function createEmailProvider(config: EmailConfig): EmailProvider {
   switch (config.provider) {
     case 'resend':
       return new ResendEmailProvider(config.credentials);
+    case 'gmail':
+      return new GmailEmailProvider(config.credentials);
     case 'sendgrid':
     case 'mailgun':
       console.warn(`Email provider "${config.provider}" not yet implemented. Defaulting to Resend.`);

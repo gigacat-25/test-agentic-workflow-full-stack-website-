@@ -33,6 +33,15 @@ export interface Env {
   EMAIL_PROVIDER: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+
+  // Clerk Auth
+  CLERK_JWKS_URL?: string;
+
+  // Google OAuth / Gmail API configuration
+  GOOGLE_GMAIL_CLIENT_ID?: string;
+  GOOGLE_GMAIL_CLIENT_SECRET?: string;
+  GOOGLE_GMAIL_REFRESH_TOKEN?: string;
+  GOOGLE_GMAIL_SENDER_EMAIL?: string;
 }
 
 /**

@@ -11,8 +11,8 @@ import { formatDate } from '../db/client';
 // Business hours configuration
 const BUSINESS_HOURS = {
   start: 9,   // 9:00 AM
-  end: 17,    // 5:00 PM
-  slotDurationMinutes: 60,
+  end: 18,    // 6:00 PM (18:00)
+  slotDurationMinutes: 20,
   timezone: 'America/New_York', // Configurable per clinic location
 };
 
@@ -82,18 +82,20 @@ export class AvailabilityService {
     return available;
   }
 
-  /**
-   * Generate all possible time slots for a given date based on business hours.
-   */
   generateTimeSlots(date: string): TimeSlot[] {
     const slots: TimeSlot[] = [];
+    const startMinutes = BUSINESS_HOURS.start * 60;
+    const endMinutes = BUSINESS_HOURS.end * 60;
+    const duration = BUSINESS_HOURS.slotDurationMinutes;
 
-    for (let hour = BUSINESS_HOURS.start; hour < BUSINESS_HOURS.end; hour += 1) {
-      // Skip lunch hour (12:00-13:00) if needed
-      // if (hour === 12) continue;
+    for (let minutes = startMinutes; minutes + duration <= endMinutes; minutes += duration) {
+      const startHour = Math.floor(minutes / 60);
+      const startMin = minutes % 60;
+      const endHour = Math.floor((minutes + duration) / 60);
+      const endMin = (minutes + duration) % 60;
 
-      const start = `${hour.toString().padStart(2, '0')}:00`;
-      const end = `${(hour + 1).toString().padStart(2, '0')}:00`;
+      const start = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;
+      const end = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
       slots.push({ start, end });
     }
 
@@ -123,15 +125,18 @@ export class AvailabilityService {
       return { start: match[1], end: match[2] };
     }
 
-    // Try to parse single hour like "10:00" (assume 1-hour slot)
+    // Try to parse single hour like "10:00" (assume slotDurationMinutes slot)
     const singleMatch = lower.match(/(\d{1,2}):(\d{2})/);
     if (singleMatch) {
       const hour = parseInt(singleMatch[1], 10);
-      const minute = singleMatch[2];
-      const endHour = hour + 1;
+      const minute = parseInt(singleMatch[2], 10);
+      const startMinutes = hour * 60 + minute;
+      const endMinutes = startMinutes + BUSINESS_HOURS.slotDurationMinutes;
+      const endHour = Math.floor(endMinutes / 60);
+      const endMin = endMinutes % 60;
       return {
-        start: `${hour.toString().padStart(2, '0')}:${minute}`,
-        end: `${endHour.toString().padStart(2, '0')}:${minute}`,
+        start: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+        end: `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`,
       };
     }
 

@@ -203,4 +203,40 @@ export function registerPublicRoutes(router: any, services: AppServices): void {
   // Simple health check
   // ============================================================
   // (Handled at the router level in index.ts)
+
+  // ============================================================
+  // GET /api/public/test-email
+  // Trigger a test email via the Notification Service
+  // ============================================================
+  router.get('/api/public/test-email', async (request: IRequest) => {
+    const mockPatient = {
+      id: 'test-patient-id',
+      name: 'Test Patient',
+      phone: null,
+      email: 'thejaswinps@gmail.com',
+      preferred_channel: 'email' as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    const mockAppointment = {
+      id: 'test-appointment-id',
+      patient_id: 'test-patient-id',
+      doctor_id: null,
+      service_type: 'skin' as const,
+      status: 'confirmed' as const,
+      source: 'web_form' as const,
+      start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      end_time: new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString(),
+      notes: 'Test email run',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    await services.notificationService.sendAppointmentConfirmation(mockAppointment, mockPatient);
+
+    return new Response(
+      JSON.stringify({ success: true, message: 'Test email triggered to thejaswinps@gmail.com via notificationService' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  });
 }
