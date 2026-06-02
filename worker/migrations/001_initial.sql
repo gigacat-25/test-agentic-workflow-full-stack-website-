@@ -108,8 +108,7 @@ CREATE INDEX idx_logs_created ON appointment_logs(created_at);
 -- ============================================================
 -- SEED DATA: Default admin staff user
 -- Password: admin123
--- Generated bcrypt hash: $2a$10$8KzQMGx5C5Kc5Qy5Q5z5Q.5y5z5Q5y5Q5z5Q5y5Q5z5Q5y5Q5z5
--- (This is a placeholder hash; admin should reset password on first login)
+-- Generated bcrypt hash: $2a$10$ctqBfQhl3MsrxVj2Ju8j/.mhAMHo86l8WOnkvyEs95S5HXrfqKmv6
 -- ============================================================
 INSERT INTO staff_users (id, name, role, email, password_hash)
 VALUES (
@@ -117,5 +116,5 @@ VALUES (
   'Admin User',
   'admin',
   'admin@skincareclinic.com',
-  '$2a$10$8KzQMGx5C5Kc5Qy5Q5z5Q.5y5z5Q5y5Q5z5Q5y5Q5z5Q5y5Q5z5'
+  '$2a$10$ctqBfQhl3MsrxVj2Ju8j/.mhAMHo86l8WOnkvyEs95S5HXrfqKmv6'
 );

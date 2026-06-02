@@ -68,26 +68,23 @@ export interface RequestWithStaff extends IRequest {
 }
 
 // -----------------------------------------------------------------
-// Router setup
-// -----------------------------------------------------------------
-const router = Router();
-
-// CORS preflight
-router.options('*', () => {
-  return new Response(null, { status: 204, headers: corsHeaders });
-});
-
-// Health check
-router.get('/api/health', () => {
-  return jsonResponse({ success: true, message: 'OK', timestamp: new Date().toISOString() });
-});
-
-// -----------------------------------------------------------------
 // Main fetch handler
 // -----------------------------------------------------------------
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
+      const router = Router();
+
+      // CORS preflight
+      router.options('*', () => {
+        return new Response(null, { status: 204, headers: corsHeaders });
+      });
+
+      // Health check
+      router.get('/api/health', () => {
+        return jsonResponse({ success: true, message: 'OK', timestamp: new Date().toISOString() });
+      });
+
       // Initialize services for this request
       // (Service instances are lightweight — created per request for isolation)
       const services = createServices(env);
@@ -98,7 +95,10 @@ export default {
       registerWebhookRoutes(router, services);
 
       // Handle the request
-      const response = await router.handle(request, env, ctx);
+      const response = await router.fetch(request, env, ctx);
+      if (!response) {
+        return jsonResponse({ success: false, error: 'Not found', code: 'NOT_FOUND' }, 404);
+      }
       return withCors(response);
     } catch (err) {
       if (err instanceof AppError) {

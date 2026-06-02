@@ -11,7 +11,7 @@ import { createAuthMiddleware, generateToken } from '../middleware/auth';
 import { validateRequired } from '../middleware/validation';
 import { badRequest, unauthorized } from '../utils/errors';
 import { StaffRole } from '../db/schema';
-import { generateId } from '../db/client';
+import { generateId, Env } from '../db/client';
 
 export function registerStaffRoutes(router: any, services: AppServices, jwtSecret: string): void {
   const { patientService, appointmentService, followUpService, feedbackService } = services;
@@ -20,17 +20,13 @@ export function registerStaffRoutes(router: any, services: AppServices, jwtSecre
   // ============================================================
   // POST /api/staff/auth/login
   // ============================================================
-  router.post('/api/staff/auth/login', async (request: IRequest) => {
+  router.post('/api/staff/auth/login', async (request: IRequest, env: Env) => {
     const body = (await request.json?.() || {}) as Record<string, any>;
     validateRequired(body, ['email', 'password']);
 
     const email = (body.email as string).toLowerCase().trim();
     const password = body.password as string;
 
-    // Find staff user by email
-    const db = (request as any).env?.DB;
-    // We need DB access — in itty-router, env is passed as second arg
-    const env = (request as any).env;
     if (!env?.DB) {
       throw unauthorized('Database not available');
     }
