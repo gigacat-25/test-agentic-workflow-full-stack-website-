@@ -102,6 +102,15 @@ export function registerPublicRoutes(router: any, services: AppServices): void {
       notes,
     });
 
+    // Send request receipt notification (fire and forget)
+    try {
+      services.notificationService.sendAppointmentRequestReceipt(appointment, patient).catch(e => {
+        console.error('[Notification] Failed to send request receipt:', e);
+      });
+    } catch (err) {
+      console.error('[Notification] Error triggering request receipt:', err);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

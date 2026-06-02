@@ -19,11 +19,78 @@ import { createWhatsAppProvider, createEmailProvider } from '../channels/whatsap
 
 // No extra params needed — always processes all pending feedback
 export interface PostVisitParams {
+  appointmentId?: string;
   triggeredAt?: string; // ISO timestamp, for logging
 }
 
 export class PostVisitWorkflow extends WorkflowEntrypoint<Env, PostVisitParams> {
   async run(event: WorkflowEvent<PostVisitParams>, step: WorkflowStep) {
+    const { appointmentId } = event.payload;
+
+    if (appointmentId) {
+      console.log(`[PostVisitWorkflow] Starting 2-hour delay for appointment ${appointmentId}`);
+
+      // Sleep for 2 hours (Workflows handle sleeping durably)
+      await step.sleep('wait-2-hours', '2 hours');
+
+      // Fetch appointment and check if feedback was already submitted or if appointment was cancelled/changed
+      const appointment = await step.do('check-appointment-status', async () => {
+        const appt = await this.env.DB.prepare(
+          `SELECT a.*, f.id as feedback_id
+           FROM appointments a
+           LEFT JOIN feedback f ON a.id = f.appointment_id
+           WHERE a.id = ?`,
+        )
+          .bind(appointmentId)
+          .first<any>();
+        return appt;
+      });
+
+      if (!appointment) {
+        console.log(`[PostVisitWorkflow] Appointment ${appointmentId} not found. Exiting.`);
+        return { success: false, reason: 'not_found' };
+      }
+
+      if (appointment.status !== 'completed') {
+        console.log(`[PostVisitWorkflow] Appointment ${appointmentId} status is ${appointment.status}, not completed. Exiting.`);
+        return { success: false, reason: 'not_completed' };
+      }
+
+      if (appointment.feedback_id) {
+        console.log(`[PostVisitWorkflow] Appointment ${appointmentId} already has feedback. Exiting.`);
+        return { success: false, reason: 'feedback_already_exists' };
+      }
+
+      // Send the feedback request
+      const result = await step.do(
+        `send-feedback-${appointmentId}`,
+        { retries: { limit: 3, delay: '15 seconds', backoff: 'exponential' } },
+        async () => {
+          const patient = await this.env.DB.prepare(
+            'SELECT * FROM patients WHERE id = ?',
+          )
+            .bind(appointment.patient_id)
+            .first<any>();
+
+          if (!patient) return { ok: false, reason: 'patient_not_found' };
+
+          const notificationService = this.createNotificationService();
+          await notificationService.sendPostVisitFeedback(
+            {
+              ...appointment,
+              doctor_id: appointment.doctor_id ?? null,
+              notes: appointment.notes ?? null,
+            },
+            patient,
+          );
+
+          return { ok: true };
+        },
+      );
+
+      return { success: result.ok, sent: result.ok ? 1 : 0 };
+    }
+
     const triggeredAt = event.payload.triggeredAt ?? new Date().toISOString();
 
     // ── Step 1: Find completed appointments with no feedback ──
