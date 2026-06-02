@@ -1,155 +1,136 @@
 // ============================================================
-// Appointment Reminder Workflow
+// Appointment Reminder Workflow — Cloudflare Workflows
 //
-// Phase 1: Simple function that can be called from a CRON trigger.
-// Phase 2: Convert to Cloudflare Workflows for durable execution.
+// Uses WorkflowEntrypoint for durable, retryable execution.
+// Each step is checkpointed; Cloudflare re-runs only failed
+// steps on retry — no double-sends.
 //
-// Cloudflare Workflows Pattern (Phase 2):
-// ```
-// import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from 'cloudflare:workers';
-//
-// export class ReminderWorkflow extends WorkflowEntrypoint<Env, Params> {
-//   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
-//     const appointments = await step.do('fetch appointments', async () => {
-//       return await this.env.DB.prepare(...).all();
-//     });
-//     for (const apt of appointments) {
-//       await step.do(`remind-${apt.id}`, async () => {
-//         await this.sendReminder(apt);
-//       });
-//     }
-//   }
-// }
-// ```
+// Bindings required in wrangler.toml:
+//   [[workflows]]
+//   binding = "REMINDER_WORKFLOW"
+//   name = "reminder-workflow"
+//   class_name = "ReminderWorkflow"
 // ============================================================
 
+import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from 'cloudflare:workers';
 import { Env } from '../db/client';
-import { PatientService } from '../services/patient.service';
-import { AppointmentService } from '../services/appointment.service';
 import { NotificationService } from '../services/notification.service';
 import { createWhatsAppProvider, createEmailProvider } from '../channels/whatsapp';
 
-export class ReminderWorkflow {
-  /**
-   * Send reminders for tomorrow's appointments.
-   * Called by the scheduler (CRON) every morning at 8 AM.
-   */
-  async processDayBeforeReminders(env: Env): Promise<{ sent: number; failed: number; total: number }> {
-    const db = env.DB;
-    const patientService = new PatientService(db);
-    const appointmentService = new AppointmentService(db);
-    const notificationService = this.createNotificationService(env);
+// Parameters passed when triggering the workflow
+export interface ReminderParams {
+  /** "day_before" or "hour_before" */
+  reminderType: 'day_before' | 'hour_before';
+}
 
-    // Calculate tomorrow's date
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = tomorrow.toISOString().split('T')[0];
+export class ReminderWorkflow extends WorkflowEntrypoint<Env, ReminderParams> {
+  async run(event: WorkflowEvent<ReminderParams>, step: WorkflowStep) {
+    const { reminderType } = event.payload;
 
-    // Get confirmed appointments for tomorrow
-    const appointments = await appointmentService.getByDate(dateStr, 'confirmed');
+    // ── Step 1: Fetch appointments to remind ──────────────────
+    const appointments = await step.do('fetch-appointments', async () => {
+      let dateStr: string;
 
+      if (reminderType === 'day_before') {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        dateStr = tomorrow.toISOString().split('T')[0];
+      } else {
+        dateStr = new Date().toISOString().split('T')[0];
+      }
+
+      const result = await this.env.DB.prepare(
+        `SELECT * FROM appointments
+         WHERE date(start_time) = ?
+           AND status = 'confirmed'
+         ORDER BY start_time ASC`,
+      )
+        .bind(dateStr)
+        .all<any>();
+
+      return result.results || [];
+    });
+
+    if (appointments.length === 0) {
+      console.log(`[ReminderWorkflow] No ${reminderType} reminders to send`);
+      return { sent: 0, failed: 0, total: 0 };
+    }
+
+    // ── Step 2: Send each reminder in its own durable step ────
     let sent = 0;
     let failed = 0;
 
     for (const appointment of appointments) {
-      try {
-        const patient = await patientService.findById(appointment.patient_id);
-        if (patient) {
+      const result = await step.do(
+        `send-reminder-${appointment.id}`,
+        { retries: { limit: 3, delay: '10 seconds', backoff: 'exponential' } },
+        async () => {
+          const patientResult = await this.env.DB.prepare(
+            'SELECT * FROM patients WHERE id = ?',
+          )
+            .bind(appointment.patient_id)
+            .first<any>();
+
+          if (!patientResult) return { ok: false, reason: 'patient_not_found' };
+
+          const notificationService = this.createNotificationService();
           await notificationService.sendReminder(
             {
               ...appointment,
-              doctor_id: appointment.doctor_id || null,
-              notes: appointment.notes || null,
+              doctor_id: appointment.doctor_id ?? null,
+              notes: appointment.notes ?? null,
             },
-            patient,
-            'day_before',
+            patientResult,
+            reminderType,
           );
-          sent++;
-        }
-      } catch (err) {
-        console.error(`[ReminderWorkflow] Failed to send reminder for ${appointment.id}:`, err);
+
+          return { ok: true };
+        },
+      );
+
+      if (result.ok) {
+        sent++;
+      } else {
         failed++;
+        console.warn(`[ReminderWorkflow] Skipped reminder for ${appointment.id}: ${result.reason}`);
       }
     }
 
-    console.log(`[ReminderWorkflow] Day-before reminders: ${sent} sent, ${failed} failed, ${appointments.length} total`);
+    console.log(
+      `[ReminderWorkflow] ${reminderType}: ${sent} sent, ${failed} failed, ${appointments.length} total`,
+    );
     return { sent, failed, total: appointments.length };
   }
 
-  /**
-   * Send reminders for appointments happening within the next 2 hours.
-   * Called by the scheduler every 2 hours.
-   */
-  async processHourlyReminders(env: Env): Promise<{ sent: number; failed: number; total: number }> {
-    const db = env.DB;
-    const patientService = new PatientService(db);
-    const appointmentService = new AppointmentService(db);
-    const notificationService = this.createNotificationService(env);
-
-    const now = new Date();
-    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-    const todayStr = now.toISOString().split('T')[0];
-
-    const appointments = await appointmentService.getByDate(todayStr, 'confirmed');
-
-    // Filter to appointments starting within the next 2 hours
-    const upcomingAppointments = appointments.filter(apt => {
-      const startTime = new Date(apt.start_time);
-      return startTime > now && startTime <= twoHoursLater;
-    });
-
-    let sent = 0;
-    let failed = 0;
-
-    for (const appointment of upcomingAppointments) {
-      try {
-        const patient = await patientService.findById(appointment.patient_id);
-        if (patient) {
-          await notificationService.sendReminder(
-            {
-              ...appointment,
-              doctor_id: appointment.doctor_id || null,
-              notes: appointment.notes || null,
-            },
-            patient,
-            'hour_before',
-          );
-          sent++;
-        }
-      } catch (err) {
-        console.error(`[ReminderWorkflow] Failed to send hourly reminder for ${appointment.id}:`, err);
-        failed++;
-      }
-    }
-
-    console.log(`[ReminderWorkflow] Hourly reminders: ${sent} sent, ${failed} failed, ${upcomingAppointments.length} total`);
-    return { sent, failed, total: upcomingAppointments.length };
-  }
-
-  private createNotificationService(env: Env): NotificationService {
+  // ── Notification service factory ──────────────────────────
+  private createNotificationService(): NotificationService {
     const whatsappProvider = createWhatsAppProvider({
-      provider: env.WHATSAPP_PROVIDER,
+      provider: this.env.WHATSAPP_PROVIDER,
       credentials: {
-        accountSid: env.TWILIO_ACCOUNT_SID || '',
-        authToken: env.TWILIO_AUTH_TOKEN || '',
-        fromNumber: env.TWILIO_WHATSAPP_FROM || '',
+        accountSid: this.env.TWILIO_ACCOUNT_SID || '',
+        authToken: this.env.TWILIO_AUTH_TOKEN || '',
+        fromNumber: this.env.TWILIO_WHATSAPP_FROM || '',
       },
     });
 
     const emailProvider = createEmailProvider({
-      provider: env.EMAIL_PROVIDER,
+      provider: this.env.EMAIL_PROVIDER,
       credentials: {
-        apiKey: env.RESEND_API_KEY || '',
-        fromEmail: env.RESEND_FROM_EMAIL || 'noreply@skincareclinic.com',
+        apiKey: this.env.RESEND_API_KEY || '',
+        fromEmail: this.env.RESEND_FROM_EMAIL || 'noreply@skincareclinic.com',
+        clientId: this.env.GOOGLE_GMAIL_CLIENT_ID || '',
+        clientSecret: this.env.GOOGLE_GMAIL_CLIENT_SECRET || '',
+        refreshToken: this.env.GOOGLE_GMAIL_REFRESH_TOKEN || '',
+        senderEmail: this.env.GOOGLE_GMAIL_SENDER_EMAIL || '',
       },
     });
 
     return new NotificationService(
       whatsappProvider,
       emailProvider,
-      env.CLINIC_NAME || 'SkinCare Clinic',
-      env.CLINIC_ADDRESS || '',
-      env.BASE_URL || '',
+      this.env.CLINIC_NAME || 'SkinCare Clinic',
+      this.env.CLINIC_ADDRESS || '',
+      this.env.BASE_URL || '',
     );
   }
 }

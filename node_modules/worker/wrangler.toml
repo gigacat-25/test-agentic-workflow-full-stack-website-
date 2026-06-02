@@ -19,6 +19,19 @@ binding = "IMAGES_BUCKET"
 bucket_name = "clinic-images"
 
 # ============================================================
+# Cloudflare Workflows (Durable Execution)
+# ============================================================
+[[workflows]]
+binding = "REMINDER_WORKFLOW"
+name = "reminder-workflow"
+class_name = "ReminderWorkflow"
+
+[[workflows]]
+binding = "POST_VISIT_WORKFLOW"
+name = "post-visit-workflow"
+class_name = "PostVisitWorkflow"
+
+# ============================================================
 # Environment Variables
 # ============================================================
 [vars]
@@ -27,7 +40,7 @@ CLINIC_NAME = "Dr. Keshav's Skin, Hair, Cosmetic & Laser Clinic"
 CLINIC_ADDRESS = "Above Delight Fast Food, near Mathikere Bus Stop, Mathikere, Bengaluru"
 CLINIC_PHONE = "+91 98800 32191"
 CLINIC_EMAIL = "contact@drkeshavsclinic.com"
-BASE_URL = "http://localhost:8787"
+BASE_URL = "https://dermatology-clinic-api.thejaswinps.workers.dev"
 
 # WhatsApp Provider Configuration
 WHATSAPP_PROVIDER = "twilio"
@@ -41,12 +54,12 @@ RESEND_API_KEY = "your-resend-api-key"
 RESEND_FROM_EMAIL = "noreply@skincareclinic.com"
 
 # ============================================================
-# Scheduled Triggers (uncomment for production)
+# Scheduled Triggers — fire workflows on a CRON schedule
 # ============================================================
-# [triggers]
-# crons = ["0 8 * * *", "0 */2 * * *"]
-#   - 8am daily: send day-of reminders + feedback requests
-#   - every 2 hours: send upcoming-hour reminders
+[triggers]
+crons = ["0 8 * * *", "0 */2 * * *"]
+# - 8 AM daily  → send day-before reminders + post-visit feedback requests
+# - Every 2 hrs → send hour-before appointment reminders
 
 # ============================================================
 # Cloudflare Pages integration

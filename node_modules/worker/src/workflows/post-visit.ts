@@ -1,92 +1,128 @@
 // ============================================================
-// Post-Visit Feedback Workflow
+// Post-Visit Feedback Workflow — Cloudflare Workflows
 //
-// Phase 1: Simple function that can be called from a CRON trigger.
-// Phase 2: Convert to Cloudflare Workflows for durable execution.
+// Uses WorkflowEntrypoint for durable, retryable execution.
+// Sends feedback request messages to patients whose appointments
+// were completed ≥ 2 hours ago and have no feedback yet.
+//
+// Bindings required in wrangler.toml:
+//   [[workflows]]
+//   binding = "POST_VISIT_WORKFLOW"
+//   name = "post-visit-workflow"
+//   class_name = "PostVisitWorkflow"
 // ============================================================
 
+import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from 'cloudflare:workers';
 import { Env } from '../db/client';
-import { PatientService } from '../services/patient.service';
-import { AppointmentService } from '../services/appointment.service';
 import { NotificationService } from '../services/notification.service';
 import { createWhatsAppProvider, createEmailProvider } from '../channels/whatsapp';
 
-export class PostVisitWorkflow {
-  /**
-   * Send feedback requests for recently completed appointments.
-   * Called by the scheduler every day (e.g. at the end of the day).
-   */
-  async processFeedbackRequests(env: Env): Promise<{ sent: number; failed: number; total: number }> {
-    const db = env.DB;
-    const patientService = new PatientService(db);
-    const notificationService = this.createNotificationService(env);
+// No extra params needed — always processes all pending feedback
+export interface PostVisitParams {
+  triggeredAt?: string; // ISO timestamp, for logging
+}
 
-    // Query appointments completed at least 2 hours ago that do not have feedback yet
-    // D1 SQL query: joins appointments, patients, and left joins feedback to find rows where feedback is missing
-    const query = `
-      SELECT a.*
-      FROM appointments a
-      LEFT JOIN feedback f ON a.id = f.appointment_id
-      WHERE a.status = 'completed'
-      AND f.id IS NULL
-      AND datetime(a.end_time) <= datetime('now', '-2 hours')
-    `;
+export class PostVisitWorkflow extends WorkflowEntrypoint<Env, PostVisitParams> {
+  async run(event: WorkflowEvent<PostVisitParams>, step: WorkflowStep) {
+    const triggeredAt = event.payload.triggeredAt ?? new Date().toISOString();
 
-    const result = await db.prepare(query).all<any>();
-    const completedAppointments = result.results || [];
+    // ── Step 1: Find completed appointments with no feedback ──
+    const appointments = await step.do('fetch-pending-feedback', async () => {
+      const result = await this.env.DB.prepare(
+        `SELECT a.*
+         FROM appointments a
+         LEFT JOIN feedback f ON a.id = f.appointment_id
+         WHERE a.status = 'completed'
+           AND f.id IS NULL
+           AND datetime(a.end_time) <= datetime('now', '-2 hours')
+         ORDER BY a.end_time DESC
+         LIMIT 100`,
+      ).all<any>();
 
+      return result.results || [];
+    });
+
+    if (appointments.length === 0) {
+      console.log(`[PostVisitWorkflow] No pending feedback requests at ${triggeredAt}`);
+      return { sent: 0, failed: 0, total: 0 };
+    }
+
+    // ── Step 2: Send feedback request for each appointment ────
     let sent = 0;
     let failed = 0;
 
-    for (const appointment of completedAppointments) {
-      try {
-        const patient = await patientService.findById(appointment.patient_id);
-        if (patient) {
-          // Send post-visit feedback request
+    for (const appointment of appointments) {
+      const result = await step.do(
+        `send-feedback-${appointment.id}`,
+        { retries: { limit: 3, delay: '15 seconds', backoff: 'exponential' } },
+        async () => {
+          const patient = await this.env.DB.prepare(
+            'SELECT * FROM patients WHERE id = ?',
+          )
+            .bind(appointment.patient_id)
+            .first<any>();
+
+          if (!patient) return { ok: false, reason: 'patient_not_found' };
+
+          const notificationService = this.createNotificationService();
           await notificationService.sendPostVisitFeedback(
             {
               ...appointment,
-              doctor_id: appointment.doctor_id || null,
-              notes: appointment.notes || null,
+              doctor_id: appointment.doctor_id ?? null,
+              notes: appointment.notes ?? null,
             },
             patient,
           );
-          sent++;
-        }
-      } catch (err) {
-        console.error(`[PostVisitWorkflow] Failed to send feedback request for appointment ${appointment.id}:`, err);
+
+          return { ok: true };
+        },
+      );
+
+      if (result.ok) {
+        sent++;
+      } else {
         failed++;
+        console.warn(
+          `[PostVisitWorkflow] Skipped feedback for ${appointment.id}: ${result.reason}`,
+        );
       }
     }
 
-    console.log(`[PostVisitWorkflow] Feedback requests: ${sent} sent, ${failed} failed, ${completedAppointments.length} total`);
-    return { sent, failed, total: completedAppointments.length };
+    console.log(
+      `[PostVisitWorkflow] Feedback: ${sent} sent, ${failed} failed, ${appointments.length} total`,
+    );
+    return { sent, failed, total: appointments.length };
   }
 
-  private createNotificationService(env: Env): NotificationService {
+  // ── Notification service factory ──────────────────────────
+  private createNotificationService(): NotificationService {
     const whatsappProvider = createWhatsAppProvider({
-      provider: env.WHATSAPP_PROVIDER,
+      provider: this.env.WHATSAPP_PROVIDER,
       credentials: {
-        accountSid: env.TWILIO_ACCOUNT_SID || '',
-        authToken: env.TWILIO_AUTH_TOKEN || '',
-        fromNumber: env.TWILIO_WHATSAPP_FROM || '',
+        accountSid: this.env.TWILIO_ACCOUNT_SID || '',
+        authToken: this.env.TWILIO_AUTH_TOKEN || '',
+        fromNumber: this.env.TWILIO_WHATSAPP_FROM || '',
       },
     });
 
     const emailProvider = createEmailProvider({
-      provider: env.EMAIL_PROVIDER,
+      provider: this.env.EMAIL_PROVIDER,
       credentials: {
-        apiKey: env.RESEND_API_KEY || '',
-        fromEmail: env.RESEND_FROM_EMAIL || 'noreply@skincareclinic.com',
+        apiKey: this.env.RESEND_API_KEY || '',
+        fromEmail: this.env.RESEND_FROM_EMAIL || 'noreply@skincareclinic.com',
+        clientId: this.env.GOOGLE_GMAIL_CLIENT_ID || '',
+        clientSecret: this.env.GOOGLE_GMAIL_CLIENT_SECRET || '',
+        refreshToken: this.env.GOOGLE_GMAIL_REFRESH_TOKEN || '',
+        senderEmail: this.env.GOOGLE_GMAIL_SENDER_EMAIL || '',
       },
     });
 
     return new NotificationService(
       whatsappProvider,
       emailProvider,
-      env.CLINIC_NAME || 'SkinCare Clinic',
-      env.CLINIC_ADDRESS || '',
-      env.BASE_URL || '',
+      this.env.CLINIC_NAME || 'SkinCare Clinic',
+      this.env.CLINIC_ADDRESS || '',
+      this.env.BASE_URL || '',
     );
   }
 }

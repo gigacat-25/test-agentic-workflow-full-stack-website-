@@ -18,7 +18,12 @@ import { Env } from './db/client';
 import { registerPublicRoutes } from './routes/public';
 import { registerStaffRoutes } from './routes/staff';
 import { registerWebhookRoutes } from './routes/webhooks';
-import { SchedulerHandler } from './workflows/scheduler';
+import { ReminderWorkflow } from './workflows/reminders';
+import { PostVisitWorkflow } from './workflows/post-visit';
+
+// Re-export Workflow classes — Cloudflare requires these named exports
+// to register the workflow bindings defined in wrangler.toml
+export { ReminderWorkflow, PostVisitWorkflow };
 
 // -----------------------------------------------------------------
 // CORS headers for all responses
@@ -112,13 +117,36 @@ export default {
     }
   },
 
-  /**
-   * Scheduled (CRON) handler for reminders and post-visit feedback.
-   * Uncomment triggers in wrangler.toml for production.
-   */
+  // Scheduled (CRON) handler — triggers Cloudflare Workflows for
+  // durable, retryable execution of reminders and feedback requests.
+  //
+  // CRON schedule (wrangler.toml):
+  //   "0 8 * * *"    = 8 AM UTC daily  — day-before reminders + post-visit feedback
+  //   "0 */2 * * *"  = every 2 hours   — hour-before reminders
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    const handler = new SchedulerHandler();
-    await handler.handleScheduledEvent(event, env, ctx);
+    const hour = new Date(event.scheduledTime).getUTCHours();
+    const triggeredAt = new Date(event.scheduledTime).toISOString();
+
+    if (hour === 8) {
+      // 8 AM UTC daily: send day-before reminders + post-visit feedback
+      ctx.waitUntil(
+        env.REMINDER_WORKFLOW.create({
+          params: { reminderType: 'day_before' },
+        }),
+      );
+      ctx.waitUntil(
+        env.POST_VISIT_WORKFLOW.create({
+          params: { triggeredAt },
+        }),
+      );
+    } else {
+      // Every 2 hours: send hour-before reminders
+      ctx.waitUntil(
+        env.REMINDER_WORKFLOW.create({
+          params: { reminderType: 'hour_before' },
+        }),
+      );
+    }
   },
 };
 
