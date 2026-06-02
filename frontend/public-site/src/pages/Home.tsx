@@ -38,23 +38,23 @@ export default function Home() {
           <div className="services-grid">
             <div className="card service-card card-hover">
               <div className="service-icon">🩺</div>
-              <h3 className="card-title">Skin Treatments</h3>
+              <h3 className="card-title">Dermatology</h3>
               <p>
-                Professional care for acne, eczema, psoriasis, rosacea, moles, and skin cancer screenings. Board-certified dermatology solutions.
+                Treatment for acne, pigmentation, psoriasis, skin allergies, and minor dermatologic surgeries led by expert clinical care.
               </p>
             </div>
             <div className="card service-card card-hover">
-              <div className="service-icon">💇‍♀️</div>
-              <h3 className="card-title">Hair & Scalp Care</h3>
+              <div className="service-icon">💇‍♂️</div>
+              <h3 className="card-title">Hair & Trichology</h3>
               <p>
-                Comprehensive evaluation and treatments for hair loss, thinning, scalp infections, alopecia, and restorative therapies.
+                Advanced solutions for hair loss and thinning, hair spas, LLLT (Low-Level Laser Therapy), and hair transplants.
               </p>
             </div>
             <div className="card service-card card-hover">
               <div className="service-icon">✨</div>
-              <h3 className="card-title">Aesthetic Care</h3>
+              <h3 className="card-title">Aesthetics & Laser</h3>
               <p>
-                Advanced cosmetic treatments including chemical peels, microneedling, anti-aging therapies, and custom skincare consultations.
+                Modern cosmetic treatments including HydraFacials, safe laser hair removal, and laser skin resurfacing therapies.
               </p>
             </div>
           </div>
@@ -65,20 +65,20 @@ export default function Home() {
       <section className="section-padding">
         <div className="container doctor-profile">
           <div className="doctor-image-container">
-            <div className="doctor-placeholder-photo">👩‍⚕️</div>
+            <div className="doctor-placeholder-photo">👨‍⚕️</div>
           </div>
           <div className="doctor-bio">
-            <span className="eyebrow">Expert Dermatologist</span>
-            <h3>Dr. Sarah Chen, MD, FAAD</h3>
-            <p className="doctor-subtitle">Board-Certified Dermatologist & Medical Director</p>
+            <span className="eyebrow">Expert Dermatologist & Cosmetologist</span>
+            <h3>Dr. Keshava M</h3>
+            <p className="doctor-subtitle">Dermatologist, Cosmetologist & Trichologist (25+ Years Experience)</p>
             <p className="doctor-text">
-              Dr. Sarah Chen has over 15 years of experience delivering clinical excellence in medical and cosmetic dermatology. She completed her residency at Stanford University and is dedicated to helping patients achieve healthy, beautiful skin.
+              Dr. Keshava M is a highly respected dermatologist, cosmetologist, and trichologist in Bangalore with over two decades of experience. He is dedicated to offering advanced, customized care to every patient.
             </p>
             <p className="doctor-text">
-              At SkinCare Clinic, she integrates the latest medical advances with personalized aesthetic plans to deliver outstanding, natural-looking results.
+              At his clinic in Mathikere, he integrates advanced laser technology, clinical dermatology, and progressive hair transplant methods to provide outstanding, natural-looking results.
             </p>
             <Link to="/book" className="btn btn-secondary">
-              Book Consultation with Dr. Chen
+              Book Consultation with Dr. Keshav
             </Link>
           </div>
         </div>
@@ -94,28 +94,28 @@ export default function Home() {
               <div>
                 <div className="testimonial-stars">★★★★★</div>
                 <p className="testimonial-quote">
-                  "Dr. Chen completely resolved my cystic acne when other treatments failed. The WhatsApp booking flow was also incredibly simple and fast!"
+                  "Dr. Keshav completely resolved my pigmentation issues. His 25+ years of experience really show. Highly recommended clinic in Mathikere!"
                 </p>
               </div>
-              <span className="testimonial-author">— Michael R.</span>
+              <span className="testimonial-author">— Ramesh R.</span>
             </div>
             <div className="card testimonial-card">
               <div>
                 <div className="testimonial-stars">★★★★★</div>
                 <p className="testimonial-quote">
-                  "Outstanding aesthetic results! Dr. Chen is very professional and explains every treatment plan in detail. The clinic design is warm and welcoming."
+                  "Outstanding hair spa and LLLT treatment. The hair transplant procedures here are state-of-the-art. Very friendly doctor and staff."
                 </p>
               </div>
-              <span className="testimonial-author">— Elena K.</span>
+              <span className="testimonial-author">— Priya K.</span>
             </div>
             <div className="card testimonial-card">
               <div>
                 <div className="testimonial-stars">★★★★★</div>
                 <p className="testimonial-quote">
-                  "I was able to schedule a skin checkup same-day through WhatsApp. Very efficient staff and excellent patient service."
+                  "I booked a HydraFacial and laser hair removal session online. The scheduling was very smooth, and the results are amazing."
                 </p>
               </div>
-              <span className="testimonial-author">— David L.</span>
+              <span className="testimonial-author">— Ananya S.</span>
             </div>
           </div>
         </div>

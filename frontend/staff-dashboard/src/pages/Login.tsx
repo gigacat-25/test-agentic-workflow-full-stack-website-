@@ -33,7 +33,7 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
-          <span>🩺</span> SkinCare Clinic
+          <span>🩺</span> Dr. Keshav's Clinic
         </div>
         <h2 style={{ textAlign: 'center', marginBottom: '24px', fontSize: '20px' }}>Staff Portal</h2>
         

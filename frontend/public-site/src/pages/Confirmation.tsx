@@ -31,7 +31,7 @@ export default function Confirmation() {
           <div className="success-icon">✓</div>
           <h2 className="success-title">Request Submitted!</h2>
           <p>
-            Thank you for choosing SkinCare Clinic. We have received your appointment request.
+            Thank you for choosing Dr. Keshav's Clinic. We have received your appointment request.
           </p>
 
           <div className="success-details">

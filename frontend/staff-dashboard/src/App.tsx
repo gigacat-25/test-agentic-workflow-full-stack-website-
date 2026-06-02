@@ -30,7 +30,7 @@ function Layout() {
       <aside className="sidebar">
         <div>
           <div className="sidebar-header">
-            <span>🩺</span> SkinCare Clinic
+            <span>🩺</span> Dr. Keshav's Clinic
           </div>
           <ul className="sidebar-menu">
             <li>

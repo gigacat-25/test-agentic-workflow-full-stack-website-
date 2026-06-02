@@ -11,7 +11,7 @@ function Navbar() {
     <nav className="nav-bar">
       <div className="nav-container">
         <Link to="/" className="logo">
-          <span className="logo-icon">✨</span> SkinCare Clinic
+          <span className="logo-icon">🩺</span> Dr. Keshav's Clinic
         </Link>
         <ul className="nav-links">
           <li>
@@ -35,10 +35,10 @@ function Footer() {
     <footer className="footer">
       <div className="container footer-container">
         <div className="footer-info">
-          <h4>SkinCare Clinic</h4>
-          <p>📍 123 Medical Drive, Suite 200, Cityville, ST 12345</p>
-          <p>📞 +1 (555) 123-4567</p>
-          <p>✉️ hello@skincareclinic.com</p>
+          <h4>Dr. Keshav's Clinic</h4>
+          <p>📍 Above Delight Fast Food, near Mathikere Bus Stop, Mathikere, Bengaluru</p>
+          <p>📞 +91 98800 32191 / +91 79751 65380</p>
+          <p>✉️ contact@drkeshavsclinic.com</p>
         </div>
         <div className="footer-links">
           <h4>Treatments</h4>
@@ -57,7 +57,7 @@ function Footer() {
         </div>
       </div>
       <div className="footer-bottom">
-        <p>&copy; {new Date().getFullYear()} SkinCare Clinic. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Dr. Keshav's Clinic. All rights reserved.</p>
       </div>
     </footer>
   );
